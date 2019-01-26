@@ -15,6 +15,7 @@
 #include "std/vbe.h" // struct vbe_info
 #include "string.h" // memset
 #include "util.h" // enable_bootsplash
+#include "lodepng.h" // PNG support
 
 
 /****************************************************************
@@ -101,20 +102,25 @@ enable_bootsplash(void)
         return;
     /* splash picture can be bmp or jpeg file */
     dprintf(3, "Checking for bootsplash\n");
-    u8 type = 0; /* 0 means jpg, 1 means bmp, default is 0=jpg */
+    u8 type = 0; /* 0 means jpg, 1 means bmp, 2 means png, default is 0=jpg */
     int filesize;
     u8 *filedata = romfile_loadfile("bootsplash.jpg", &filesize);
     if (!filedata) {
         filedata = romfile_loadfile("bootsplash.bmp", &filesize);
-        if (!filedata)
-            return;
         type = 1;
     }
+    if (!filedata) {
+        filedata = romfile_loadfile("bootsplash.png", &filesize);
+        type = 2;
+    }
+    if (!filedata)
+        return;
     dprintf(3, "start showing bootsplash\n");
 
     u8 *picture = NULL; /* data buff used to be flushed to the video buf */
     struct jpeg_decdata *jpeg = NULL;
     struct bmp_decdata *bmp = NULL;
+    unsigned char* png; /* png decoder allocates memory itself */
     struct vbe_info *vesa_info = malloc_tmplow(sizeof(*vesa_info));
     struct vbe_mode_info *mode_info = malloc_tmplow(sizeof(*mode_info));
     if (!vesa_info || !mode_info) {
@@ -145,34 +151,48 @@ enable_bootsplash(void)
 
     int ret, width, height;
     int bpp_require = 0;
-    if (type == 0) {
-        jpeg = jpeg_alloc();
-        if (!jpeg) {
-            warn_noalloc();
-            goto done;
-        }
-        /* Parse jpeg and get image size. */
-        dprintf(5, "Decoding bootsplash.jpg\n");
-        ret = jpeg_decode(jpeg, filedata);
-        if (ret) {
-            dprintf(1, "jpeg_decode failed with return code %d...\n", ret);
-            goto done;
-        }
-        jpeg_get_size(jpeg, &width, &height);
-    } else {
-        bmp = bmp_alloc();
-        if (!bmp) {
-            warn_noalloc();
-            goto done;
-        }
-        /* Parse bmp and get image size. */
-        dprintf(5, "Decoding bootsplash.bmp\n");
-        ret = bmp_decode(bmp, filedata, filesize);
-        if (ret) {
-            dprintf(1, "bmp_decode failed with return code %d...\n", ret);
-            goto done;
-        }
-        bmp_get_info(bmp, &width, &height, &bpp_require);
+    switch (type) {
+        case 0:
+            jpeg = jpeg_alloc();
+            if (!jpeg) {
+                warn_noalloc();
+                goto done;
+            }
+            /* Parse jpeg and get image size. */
+            dprintf(5, "Decoding bootsplash.jpg\n");
+            ret = jpeg_decode(jpeg, filedata);
+            if (ret) {
+                dprintf(1, "jpeg_decode failed with return code %d...\n", ret);
+                goto done;
+            }
+            jpeg_get_size(jpeg, &width, &height);
+            break;
+        case 1:
+            bmp = bmp_alloc();
+            if (!bmp) {
+                warn_noalloc();
+                goto done;
+            }
+            /* Parse bmp and get image size. */
+            dprintf(5, "Decoding bootsplash.bmp\n");
+            ret = bmp_decode(bmp, filedata, filesize);
+            if (ret) {
+                dprintf(1, "bmp_decode failed with return code %d...\n", ret);
+                goto done;
+            }
+            bmp_get_info(bmp, &width, &height, &bpp_require);
+            break;
+        case 2:
+            /* Parse png and get image dimensions. */
+            dprintf(5, "Decoding bootsplash.png\n");
+            // TODO: implement 24bpp support
+            ret = lodepng_decode32(&png, &width, &height, filedata, filesize);
+            if (ret) {
+                dprintf(1, "png_decode failed with return code %d...\n", ret);
+                goto done;
+            }
+            bpp_require = 32;
+            break;
     }
 
     // jpeg would use 16 or 24 bpp video mode, BMP uses 16/24/32 bpp mode.
@@ -200,22 +220,35 @@ enable_bootsplash(void)
         goto done;
     }
 
-    if (type == 0) {
-        dprintf(5, "Decompressing bootsplash.jpg\n");
-        ret = jpeg_show(jpeg, picture, width, height, depth,
-                            mode_info->bytes_per_scanline);
-        if (ret) {
-            dprintf(1, "jpeg_show failed with return code %d...\n", ret);
-            goto done;
-        }
-    } else {
-        dprintf(5, "Decompressing bootsplash.bmp\n");
-        ret = bmp_show(bmp, picture, width, height, depth,
-                           mode_info->bytes_per_scanline);
-        if (ret) {
-            dprintf(1, "bmp_show failed with return code %d...\n", ret);
-            goto done;
-        }
+    switch (type) {
+        case 0:
+            dprintf(5, "Decompressing bootsplash.jpg\n");
+            ret = jpeg_show(jpeg, picture, width, height, depth,
+                                mode_info->bytes_per_scanline);
+            if (ret) {
+                dprintf(1, "jpeg_show failed with return code %d...\n", ret);
+                goto done;
+            }
+            break;
+        case 1:
+            dprintf(5, "Decompressing bootsplash.bmp\n");
+            ret = bmp_show(bmp, picture, width, height, depth,
+                               mode_info->bytes_per_scanline);
+            if (ret) {
+                dprintf(1, "bmp_show failed with return code %d...\n", ret);
+                goto done;
+            }
+            break;
+        case 2:
+            dprintf(5, "Decompressing bootsplash.png\n");
+            memcpy(picture, png, imagesize);
+            ret = png_show(png, picture, width, height, depth,
+                               mode_info->bytes_per_scanline);
+            if (ret) {
+                dprintf(1, "png_show failed with return code %d...\n", ret);
+                goto done;
+            }
+            break;
     }
 
     /* Switch to graphics mode */
@@ -242,6 +275,7 @@ done:
     free(mode_info);
     free(jpeg);
     free(bmp);
+    free(png);
     return;
 }
 
