@@ -81,6 +81,36 @@ static void lodepng_free(void* ptr) {
   free(ptr);
 }
 
+// from bmp.c, adjustments
+static void raw_data_format_adjust_32bpp(u8 *src, u8 *dest, int width,
+                                        int height, int bytes_per_line_dest)
+{
+    int bytes_per_line_src = 4 * width;
+    int i, j;
+    for (i = 0 ; i < height ; i++) {
+
+        for (j = 0 ; j < width ; j++) {
+              dest[i * bytes_per_line_dest + j*4+0] = src[i * bytes_per_line_src + j*4+2];
+              dest[i * bytes_per_line_dest + j*4+1] = src[i * bytes_per_line_src + j*4+1];
+              dest[i * bytes_per_line_dest + j*4+2] = src[i * bytes_per_line_src + j*4+0];
+              dest[i * bytes_per_line_dest + j*4+3] = src[i * bytes_per_line_src + j*4+3];
+        }
+    }
+}
+
+int png_show(unsigned char *png, unsigned char *pic,
+             int width, int height, int depth,
+	     int bytes_per_line_dest)
+{
+    /* now only support 32bpp */
+    if (depth == 32) {
+        raw_data_format_adjust_32bpp(png, pic, width, height,
+                                        bytes_per_line_dest);
+        return 0;
+    }
+    return 1;
+}
+
 /* ////////////////////////////////////////////////////////////////////////// */
 /* ////////////////////////////////////////////////////////////////////////// */
 /* // Tools for C, and common code for PNG and Zlib.                       // */
