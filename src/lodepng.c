@@ -87,13 +87,19 @@ static void raw_data_format_adjust_32bpp(u8 *src, u8 *dest, int width,
 {
     int bytes_per_line_src = 4 * width;
     int i, j;
+    int padding = (bytes_per_line_dest - bytes_per_line_src) / 2;
     for (i = 0 ; i < height ; i++) {
+        // fill the padding bytes with black
+        for (j = 0 ; j < padding ; j++) {
+            dest[i * bytes_per_line_dest + j] = 0x00;
+            dest[i * bytes_per_line_dest + width*4 + padding + j] = 0x00;
+        }
 
         for (j = 0 ; j < width ; j++) {
-              dest[i * bytes_per_line_dest + j*4+0] = src[i * bytes_per_line_src + j*4+2];
-              dest[i * bytes_per_line_dest + j*4+1] = src[i * bytes_per_line_src + j*4+1];
-              dest[i * bytes_per_line_dest + j*4+2] = src[i * bytes_per_line_src + j*4+0];
-              dest[i * bytes_per_line_dest + j*4+3] = src[i * bytes_per_line_src + j*4+3];
+            dest[i * bytes_per_line_dest + padding + j*4+0] = src[i * bytes_per_line_src + j*4+2];
+            dest[i * bytes_per_line_dest + padding + j*4+1] = src[i * bytes_per_line_src + j*4+1];
+            dest[i * bytes_per_line_dest + padding + j*4+2] = src[i * bytes_per_line_src + j*4+0];
+            dest[i * bytes_per_line_dest + padding + j*4+3] = src[i * bytes_per_line_src + j*4+3];
         }
     }
 }
