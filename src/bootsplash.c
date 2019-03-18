@@ -57,12 +57,12 @@ static int
 find_videomode(struct vbe_info *vesa_info, struct vbe_mode_info *mode_info
                , int width, int height, int bpp_req)
 {
-    dprintf(3, "Finding vesa mode with dimensions %d/%d\n", width, height);
+    dprintf(3, "Finding vesa mode with min. dimensions %d/%d\n", width, height);
     u16 *videomodes = SEGOFF_TO_FLATPTR(vesa_info->video_mode);
     for (;; videomodes++) {
         u16 videomode = *videomodes;
         if (videomode == 0xffff) {
-            dprintf(1, "Unable to find vesa video mode dimensions %d/%d\n"
+            dprintf(1, "Unable to fit image into dimensions %d/%d\n"
                     , width, height);
             return -1;
         }
@@ -77,8 +77,8 @@ find_videomode(struct vbe_info *vesa_info, struct vbe_mode_info *mode_info
             dprintf(1, "get_mode failed.\n");
             continue;
         }
-        if (mode_info->xres != width
-            || mode_info->yres != height)
+        if (mode_info->xres < width
+            || mode_info->yres < height)
             continue;
         u8 depth = mode_info->bits_per_pixel;
         if (bpp_req == 0) {
@@ -201,7 +201,7 @@ enable_bootsplash(void)
     int videomode = find_videomode(vesa_info, mode_info, width, height,
                                        bpp_require);
     if (videomode < 0) {
-        dprintf(1, "failed to find a videomode with %dx%d %dbpp (0=any).\n",
+        dprintf(1, "failed to find videomode for %dx%d image, %dbpp (0=any).\n",
                     width, height, bpp_require);
         goto done;
     }
