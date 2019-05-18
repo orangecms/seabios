@@ -112,18 +112,21 @@ colortype: the desired color type for the raw output image. See explanation on P
 bitdepth: the desired bit depth for the raw output image. See explanation on PNG color types.
 Return value: LodePNG error code (0 means no error).
 */
-unsigned lodepng_decode_memory(unsigned char** out, unsigned* w, unsigned* h,
+unsigned lodepng_decode_memory(unsigned char** out, int* w, int* h,
                                const unsigned char* in, size_t insize,
                                LodePNGColorType colortype, unsigned bitdepth);
 
 /*Same as lodepng_decode_memory, but always decodes to 32-bit RGBA raw image*/
-unsigned lodepng_decode32(unsigned char** out, unsigned* w, unsigned* h,
+unsigned lodepng_decode32(unsigned char** out, int* w, int* h,
                           const unsigned char* in, size_t insize);
 
 /*Same as lodepng_decode_memory, but always decodes to 24-bit RGB raw image*/
-unsigned lodepng_decode24(unsigned char** out, unsigned* w, unsigned* h,
+unsigned lodepng_decode24(unsigned char** out, int* w, int* h,
                           const unsigned char* in, size_t insize);
 
+int png_show(unsigned char *png, unsigned char *pic,
+             int width, int height, int depth,
+	     int bytes_per_line_dest);
 #ifdef LODEPNG_COMPILE_DISK
 /*
 Load PNG from disk, from file with given name.
@@ -746,7 +749,7 @@ void lodepng_state_copy(LodePNGState* dest, const LodePNGState* source);
 Same as lodepng_decode_memory, but uses a LodePNGState to allow custom settings and
 getting much more information about the PNG image and color mode.
 */
-unsigned lodepng_decode(unsigned char** out, unsigned* w, unsigned* h,
+unsigned lodepng_decode(unsigned char** out, int* w, int* h,
                         LodePNGState* state,
                         const unsigned char* in, size_t insize);
 
@@ -755,7 +758,7 @@ Read the PNG header, but not the actual data. This returns only the information
 that is in the IHDR chunk of the PNG, such as width, height and color type. The
 information is placed in the info_png field of the LodePNGState.
 */
-unsigned lodepng_inspect(unsigned* w, unsigned* h,
+unsigned lodepng_inspect(int* w, int* h,
                          LodePNGState* state,
                          const unsigned char* in, size_t insize);
 #endif /*LODEPNG_COMPILE_DECODER*/

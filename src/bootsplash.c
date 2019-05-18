@@ -149,7 +149,7 @@ enable_bootsplash(void)
             vesa_info->version>>8, vesa_info->version&0xff,
             vendor, product);
 
-    int ret, width, height;
+    int ret, width = 0, height = 0;
     int bpp_require = 0;
     switch (type) {
         case 0:
